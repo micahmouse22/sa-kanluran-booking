@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resort Reservation Calendar</title>
+<style>
+  :root {
+    --brand: #245b48;
+    --brand-dark: #194535;
+    --ink: #24332d;
+    --muted: #68756f;
+    --line: #e2e8e4;
+    --soft: #f4f7f5;
+    --unavailable: #f1e7e5;
+    --unavailable-ink: #a36d65;
+    --white: #fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px;
+    background: transparent;
+    color: var(--ink);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .booking {
+    width: 100%; max-width: 520px; margin: 0 auto;
+    padding: 24px; border: 1px solid var(--line); border-radius: 18px;
+    background: var(--white); box-shadow: 0 8px 28px rgba(25,55,42,.07);
+  }
+  .eyebrow { margin: 0 0 8px; color: var(--brand); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }
+  h1 { margin: 0; font-size: clamp(22px, 5vw, 28px); line-height: 1.2; }
+  .intro { margin: 9px 0 22px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .date-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .summary-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 11px; background: #fff; min-width: 0; }
+  .summary-card span { display: block; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-bottom: 6px; }
+  .summary-card strong { font-size: 14px; font-weight: 600; }
+  .month-bar { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 14px; }
+  .month-bar h2 { margin: 0; font-size: 17px; }
+  .month-nav { display: flex; gap: 8px; }
+  .month-nav button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font-size: 20px; cursor: pointer; }
+  .month-nav button:disabled { opacity: .35; cursor: not-allowed; }
+  .weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .weekdays div { padding: 7px 0; text-align: center; color: var(--muted); font-size: 11px; font-weight: 700; }
+  .day, .empty { min-width: 0; aspect-ratio: 1 / 1; }
+  .day {
+    border: 1px solid transparent; border-radius: 9px; background: var(--soft);
+    color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .day:hover:not(:disabled) { border-color: var(--brand); }
+  .day:focus-visible, button:focus-visible { outline: 3px solid #9bc7b3; outline-offset: 2px; }
+  .day:disabled { cursor: not-allowed; }
+  .day.past { background: #fafafa; color: #c1c8c4; }
+  .day.unavailable { background: var(--unavailable); color: var(--unavailable-ink); text-decoration: line-through; }
+  .day.selected { background: var(--brand); color: white; }
+  .day.in-range { background: #e4efe9; color: var(--brand-dark); border-radius: 5px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 16px 0 18px; color: var(--muted); font-size: 11px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; display: inline-block; border-radius: 3px; background: var(--soft); border: 1px solid var(--line); }
+  .swatch.busy { background: var(--unavailable); border-color: #ead8d4; }
+  .swatch.chosen { background: var(--brand); border-color: var(--brand); }
+  .message { min-height: 21px; margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .action { width: 100%; padding: 15px 18px; border: 0; border-radius: 10px; background: var(--brand); color: white; font-size: 13px; font-weight: 700; letter-spacing: .5px; cursor: pointer; }
+  .action:hover:not(:disabled) { background: var(--brand-dark); }
+  .action:disabled { background: #aab8b0; cursor: not-allowed; }
+  .fine-print { margin: 12px 0 0; color: var(--muted); text-align: center; font-size: 10px; line-height: 1.5; }
+  .confirmation { display: none; padding: 18px; border: 1px solid #cfe1d7; border-radius: 12px; background: #f1f7f3; }
+  .confirmation.show { display: block; }
+  .confirmation h2 { margin: 0 0 8px; color: var(--brand-dark); font-size: 18px; }
+  .confirmation p { margin: 5px 0; color: var(--ink); font-size: 13px; line-height: 1.5; }
+  .reset { margin-top: 13px; padding: 10px 14px; border: 1px solid var(--brand); border-radius: 8px; background: transparent; color: var(--brand); font-weight: 700; cursor: pointer; }
+  @media (max-width: 420px) {
+    body { padding: 8px; }
+    .booking { padding: 17px; border-radius: 14px; }
+    .weekdays, .days { gap: 3px; }
+    .day { font-size: 12px; border-radius: 7px; }
+  }
+</style>
+</head>
+<body>
+<main class="booking">
+  <p class="eyebrow">RESERVATIONS</p>
+  <h1>Choose your dates</h1>
+  <p class="intro">Select your arrival and departure dates. Dates marked unavailable cannot be booked.</p>
+
+  <div class="date-summary" aria-live="polite">
+    <div class="summary-card"><span>CHECK-IN</span><strong id="checkin">Select a date</strong></div>
+    <div class="summary-card"><span>CHECK-OUT</span><strong id="checkout">Select a date</strong></div>
+  </div>
+
+  <div id="calendar-area">
+    <div class="month-bar">
+      <h2 id="month-label"></h2>
+      <div class="month-nav">
+        <button id="prev" type="button" aria-label="Previous month">‹</button>
+        <button id="next" type="button" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div class="weekdays" aria-hidden="true">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+    <div class="days" id="days" aria-label="Choose check-in and check-out dates"></div>
+    <div class="legend">
+      <span><i class="swatch"></i> Available</span>
+      <span><i class="swatch busy"></i> Unavailable</span>
+      <span><i class="swatch chosen"></i> Selected</span>
+    </div>
+    <p class="message" id="message" aria-live="polite">First, select your check-in date.</p>
+    <button class="action" id="confirm" type="button" disabled>CONTINUE</button>
+    <p class="fine-print">This is a reservation demo. No personal information is collected and no booking is submitted.</p>
+  </div>
+
+  <section class="confirmation" id="confirmation" aria-live="polite">
+    <h2>Your dates are selected!</h2>
+    <p id="confirmation-dates"></p>
+    <p id="confirmation-nights"></p>
+    <p>This is a demo confirmation only. Your reservation has not been submitted.</p>
+    <button class="reset" id="reset" type="button">Choose different dates</button>
+  </section>
+</main>
+
+<script>
+/* EDIT YOUR MOCK AVAILABILITY HERE.
+   Add dates in YYYY-MM-DD format to mark them unavailable.
+   Example: "2026-12-24", "2026-12-25"
+*/
+const UNAVAILABLE_DATES = [
+  "2026-11-25", "2026-11-26", "2026-12-05", "2026-12-06",
+  "2026-12-24", "2026-12-25", "2027-01-01", "2027-01-02"
+];
+
+const today = new Date();
+today.setHours(0,0,0,0);
+let view = new Date(today.getFullYear(), today.getMonth(), 1);
+let checkIn = null;
+let checkOut = null;
+
+const $ = id => document.getElementById(id);
+const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const pretty = d => d ? d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "Select a date";
+const unavailable = d => UNAVAILABLE_DATES.includes(key(d));
+const same = (a,b) => a && b && key(a)===key(b);
+const between = (d,a,b) => d>a && d<b;
+
+function rangeHasUnavailable(a,b) {
+  const cursor = new Date(a);
+  cursor.setDate(cursor.getDate()+1);
+  while (cursor < b) {
+    if (unavailable(cursor)) return true;
+    cursor.setDate(cursor.getDate()+1);
+  }
+  return false;
+}
+
+function render() {
+  $("month-label").textContent = view.toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  $("prev").disabled = view.getFullYear()===today.getFullYear() && view.getMonth()===today.getMonth();
+  $("days").innerHTML = "";
+  const first = new Date(view.getFullYear(),view.getMonth(),1);
+  const start = first.getDay();
+  const count = new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
+
+  for (let i=0;i<start;i++) {
+    const blank=document.createElement("div"); blank.className="empty"; $("days").appendChild(blank);
+  }
+  for (let n=1;n<=count;n++) {
+    const d=new Date(view.getFullYear(),view.getMonth(),n);
+    const b=document.createElement("button");
+    b.type="button"; b.className="day"; b.textContent=n;
+    b.setAttribute("aria-label",d.toLocaleDateString(undefined,{dateStyle:"full"}));
+    const past=d<today;
+    const busy=unavailable(d);
+    const inRange=checkIn && checkOut && between(d,checkIn,checkOut);
+    if (past) b.classList.add("past");
+    if (busy) b.classList.add("unavailable");
+    if (same(d,checkIn)||same(d,checkOut)) b.classList.add("selected");
+    else if (inRange) b.classList.add("in-range");
+    b.disabled=past||busy;
+    b.addEventListener("click",()=>choose(d));
+    $("days").appendChild(b);
+  }
+  $("checkin").textContent=pretty(checkIn);
+  $("checkout").textContent=pretty(checkOut);
+  $("confirm").disabled=!(checkIn&&checkOut);
+}
+
+function choose(d) {
+  if (!checkIn || checkOut || d<=checkIn) {
+    checkIn=d; checkOut=null;
+    $("message").textContent="Now select your check-out date.";
+  } else {
+    if (rangeHasUnavailable(checkIn,d)) {
+      $("message").textContent="Those dates include an unavailable day. Please choose another check-out date.";
+      return;
+    }
+    checkOut=d;
+    const nights=Math.round((checkOut-checkIn)/86400000);
+    $("message").textContent=`Great! Your stay is ${nights} ${nights===1?"night":"nights"}.`;
+  }
+  render();
+}
+
+$("prev").addEventListener("click",()=>{view=new Date(view.getFullYear(),view.getMonth()-1,1);render();});
+$("next").addEventListener("click",()=>{view=new Date(view.getFullYear(),view.getMonth()+1,1);render();});
+$("confirm").addEventListener("click",()=>{
+  if (!checkIn||!checkOut) return;
+  const nights=Math.round((checkOut-checkIn)/86400000);
+  $("confirmation-dates").textContent=`Check-in: ${pretty(checkIn)} · Check-out: ${pretty(checkOut)}`;
+  $("confirmation-nights").textContent=`Length of stay: ${nights} ${nights===1?"night":"nights"}`;
+  $("calendar-area").style.display="none";
+  $("confirmation").classList.add("show");
+});
+$("reset").addEventListener("click",()=>{
+  checkIn=null; checkOut=null;
+  $("confirmation").classList.remove("show");
+  $("calendar-area").style.display="block";
+  $("message").textContent="First, select your check-in date.";
+  render();
+});
+render();
+</script>
+</body>
+</html>
